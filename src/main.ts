@@ -1,6 +1,6 @@
 import Vue, { createApp, type Plugin } from "vue";
 
-import { FundingAcknowledgement, IconButton, CreditLogos } from "@cosmicds/vue-toolkit";
+import { FundingAcknowledgement, IconButton, CreditLogos, UserExperience } from "@cosmicds/vue-toolkit";
 import RubinFirstLook from "./RubinFirstLook.vue";
 import FolderView from "./components/FolderView.vue";
 import ExpansionWrapper from "./components/ExpansionWrapper.vue";
@@ -76,6 +76,7 @@ createApp(RubinFirstLook, {
   .component('infobox', Infobox)
   .component('wwt-tracked-content', WWTTrackedContent)
   .component('scalebar', Scalebar)
+  .component('user-experience', UserExperience)
 
   // Mount
   .mount("#app");
