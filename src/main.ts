@@ -2,6 +2,7 @@ import Vue, { createApp, type Plugin } from "vue";
 
 import { FundingAcknowledgement, IconButton, CreditLogos, UserExperience } from "@cosmicds/vue-toolkit";
 import RubinFirstLook from "./RubinFirstLook.vue";
+import CDSPrivacyPolicy from "./components/CDSPrivacyPolicy.vue";
 import FolderView from "./components/FolderView.vue";
 import ExpansionWrapper from "./components/ExpansionWrapper.vue";
 import Infobox from "./components/Infobox.vue";
@@ -71,6 +72,7 @@ createApp(RubinFirstLook, {
   .component('funding-acknowledgement', FundingAcknowledgement)
   .component('credit-logos', CreditLogos)
   .component('splash-screen', SplashScreen)
+  .component('cds-privacy-policy', CDSPrivacyPolicy)
   .component('folder-view', FolderView)
   .component('expansion-wrapper', ExpansionWrapper)
   .component('infobox', Infobox)
