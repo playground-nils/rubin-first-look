@@ -550,6 +550,41 @@
         </v-window>
       </v-card>
     </v-dialog>
+
+    <v-container>
+      <v-expand-transition>
+        <user-experience
+          v-if="showRating"
+          :question="question"
+          icon-size="3x"
+          @dismiss="(_rating: UserExperienceRating | null, _comments: string | null) => {
+            showRating = false;
+          }"
+          @rating="(rating: UserExperienceRating | null) => {
+            currentRating = rating;
+            updateUserExperienceInfo(currentRating, currentComments);
+          }"
+          @finish="(rating: UserExperienceRating | null, comments: string | null) => {
+            currentRating = rating;
+            currentComments = comments;
+            updateUserExperienceInfo(currentRating, currentComments)
+            showRating = false;
+          }"
+        >
+          <template #footer>
+            <v-btn
+              class="privacy-button"
+              color="#BDBDBD"
+              href="https://www.cfa.harvard.edu/privacy-statement"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+            Privacy Policy
+            </v-btn>
+          </template>
+        </user-experience>
+      </v-expand-transition>
+    </v-container>
     
   </div>
 </v-app>
@@ -612,6 +647,14 @@ const breakpoints = [
 const smallSize = computed(() => {
   return display.smAndDown.value && (display.height.value > 1.2 * display.width.value);
 });
+
+const question = Math.random() > 0.5 ? 
+  "Is this interesting?" :
+  "Are you learning something new?";
+const currentRating = ref<UserExperienceRating | null>(null);
+const currentComments = ref<string | null>(null);
+const showRating = ref(false);
+
 
 const backgroundImagesets = reactive<BackgroundImageset[]>([]);
 const sheet = ref<SheetType | null>(null);
@@ -759,6 +802,8 @@ onMounted(() => {
     });
 
     updateClosestPlace();
+
+    ratingDisplaySetup();
 
   });
 });
