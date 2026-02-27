@@ -1845,6 +1845,7 @@ h4 {
   }
 
   #user-experience-footer {
+    margin: auto;
     display: flex;
     flex-direction: row;
     gap: 5px;
