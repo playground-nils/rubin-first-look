@@ -550,20 +550,69 @@
         </v-window>
       </v-card>
     </v-dialog>
-    
+
+    <v-container>
+      <v-expand-transition>
+        <user-experience
+          v-if="showRating"
+          :question="question"
+          icon-size="3x"
+          @dismiss="(_rating: UserExperienceRating | null, _comments: string | null) => {
+            showRating = false;
+          }"
+          @rating="(rating: UserExperienceRating | null) => {
+            currentRating = rating;
+            updateUserExperienceInfo(currentRating, currentComments);
+          }"
+          @finish="(rating: UserExperienceRating | null, comments: string | null) => {
+            currentRating = rating;
+            currentComments = comments;
+            updateUserExperienceInfo(currentRating, currentComments)
+            showRating = false;
+          }"
+        >
+          <template #footer>
+            <div id="user-experience-footer">
+              <v-btn
+                class="rating-opt-put"
+                color="#BDBDBD"
+                size="small"
+                variant="text"
+                @click="onOptOutClicked"
+              >
+                Don't show again
+              </v-btn>
+              <v-btn
+                class="privacy-button"
+                color="#BDBDBD"
+                @click="showPrivacyPolicy = true"
+                @keyup.enter="showPrivacyPolicy = true"
+                size="small"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+              What is this?
+              </v-btn>
+            </div>
+          </template>
+        </user-experience>
+      </v-expand-transition>
+      <cds-privacy-policy v-model="showPrivacyPolicy" />
+    </v-container> 
   </div>
 </v-app>
 </template>
 
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
-import { ref, reactive, computed, watch, onMounted, nextTick } from "vue";
+import { ref, reactive, computed, watch, onBeforeMount, onMounted, nextTick } from "vue";
 import { useFullscreen } from "./composables/useFullscreen";
 import { D2R, H2R, distance } from "@wwtelescope/astro";
 import { Circle, Folder, Imageset, Place, WWTControl } from "@wwtelescope/engine";
 import { ImageSetType, Thumbnail } from "@wwtelescope/engine-types";
 import { GotoRADecZoomParams, engineStore } from "@wwtelescope/engine-pinia";
-import { BackgroundImageset, skyBackgroundImagesets, supportsTouchscreen, blurActiveElement, useWWTKeyboardControls } from "@cosmicds/vue-toolkit";
+import { API_BASE_URL, BackgroundImageset, skyBackgroundImagesets, supportsTouchscreen, blurActiveElement, useWWTKeyboardControls, type UserExperienceRating } from "@cosmicds/vue-toolkit";
+import { v4 } from "uuid";
 import { RUBIN_COLORS } from "../plugins/vuetify";
 import { useDisplay, useTheme } from "vuetify";
 import { type ItemSelectionType } from "./types";
@@ -613,6 +662,24 @@ const smallSize = computed(() => {
   return display.smAndDown.value && (display.height.value > 1.2 * display.width.value);
 });
 
+const question = Math.random() > 0.5 ? 
+  "Is this interesting?" :
+  "Are you learning something new?";
+const currentRating = ref<UserExperienceRating | null>(null);
+const currentComments = ref<string | null>(null);
+const showRating = ref(false);
+const showPrivacyPolicy = ref(false);
+const ratingOptedOut = ref(false);
+const UUID_KEY = "cds-rubin-first-look-uuid";
+const RATING_OPT_OUT_KEY = "cds-rubin-first-look-rating-optout";
+const STORY_RATING_URL = `${API_BASE_URL}/rubin-first-look/user-experience`;
+const maybeUUID = window.localStorage.getItem(UUID_KEY);
+const existingUser = maybeUUID !== null;
+const uuid = maybeUUID ?? v4();
+if (!existingUser) {
+  window.localStorage.setItem(UUID_KEY, uuid);
+}
+
 const backgroundImagesets = reactive<BackgroundImageset[]>([]);
 const sheet = ref<SheetType | null>(null);
 const layersLoaded = ref(false);
@@ -661,13 +728,13 @@ import { useTrackedElements } from "./composables/useTrackedElements";
 const _ute = useTrackedElements("", store);
 
 // Offsets are in RA/Dec 
-// If you passt them to :offset-x, or :offset-y instead
+// If you pass them to :offset-x, or :offset-y instead
 // offset ra will be how left/right the label is offset and 
-// // offset dec will be how up/down the label is offset
+// offset dec will be how up/down the label is offset
 interface Offset {
   raOff: number;
   decOff: number;
-  rollDeg?: number; // then name of the top-level
+  rollDeg?: number;
 }
 
 type OffsetRecords = Record<string, Offset>;
@@ -705,6 +772,11 @@ const showComingSoon = ref(false);
 watch(imagesLoaded, (newValue) => {
   showComingSoon.value = !newValue[0] && !newValue[1];
 }, { immediate: true });
+
+onBeforeMount(() => {
+  ratingOptedOut.value = window.localStorage.getItem(RATING_OPT_OUT_KEY)?.toLowerCase() === "true";
+});
+
 onMounted(() => {
   store.waitForReady().then(async () => {
     // window.addEventListener('contextmenu', function(event) {
@@ -760,8 +832,61 @@ onMounted(() => {
 
     updateClosestPlace();
 
+    ratingDisplaySetup();
   });
 });
+
+async function ratingDisplaySetup() {
+  if (ratingOptedOut.value) {
+    return;
+  }
+
+  const existingDataResponse = await fetch(`${STORY_RATING_URL}/${uuid}`, {
+    method: "GET",
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    headers: { "Authorization": process.env.VUE_APP_CDS_API_KEY ?? "" }
+  });
+
+  const existingDataContent = await existingDataResponse.json();
+  const alreadyAnswered = existingDataResponse.status === 200 && existingDataContent.ratings?.length > 0;
+
+  if (alreadyAnswered) {
+    return;
+  }
+
+  setTimeout(() => {
+    showRating.value = true;
+  }, 40_000);
+}
+
+function updateUserExperienceInfo(rating: UserExperienceRating | null, comments: string | null) {
+  const body: Record<string, unknown> = {
+    uuid,
+    question,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    story_name: "rubin-first-look",
+  };
+  if (rating) {
+    body.rating = rating;
+  }
+  if (comments) {
+    body.comments = comments;
+  }
+  fetch(STORY_RATING_URL, {
+    method: "PUT",
+    headers: {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      "Authorization": process.env.VUE_APP_CDS_API_KEY ?? "",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function onOptOutClicked() {
+  showRating.value = false;
+  ratingOptedOut.value = true;
+}
 
 function findClosest(places: Place[]): Place | null {
   let closest = currentPlace.value;
@@ -1018,6 +1143,10 @@ watch(mode, (newMode: Mode) => {
   opacity.value = 100;
 });
 watch(opacity, store.setForegroundOpacity);
+
+watch(ratingOptedOut, (optOut: boolean) => {
+  window.localStorage.setItem(RATING_OPT_OUT_KEY, optOut.toString());
+});
 </script>
 
 <style lang="less">
@@ -1671,5 +1800,55 @@ h4 {
     color: rgb(var(--v-theme-rubin-turquoise));
   }
 
+}
+
+.rating-root {
+  position: absolute !important;
+  right: 5px;
+  bottom: 0;
+  padding: 5px;
+  width: fit-content !important;
+  // left: 50%;
+  // transform: translateX(-50%);
+  gap: 0 !important;
+  border: solid 1px #EFEFEF !important;
+  border-radius: 10px !important;
+  background-color: #222222 !important;
+  opacity: 0.95 !important;
+  z-index: 20000;
+
+  .rating-title {
+    color: #EFEFEF;
+    font-size: var(--default-font-size);
+  }
+
+  .rating-icon-row {
+    
+    padding: 0px;
+
+    .svg-inline--fa {
+      height: 30px;
+    }
+  }
+
+  .comments-box {
+    width: 100%;
+    margin-top: 20px;
+  }
+
+  .v-card-text {
+    padding-bottom: 0;
+  }
+
+  .v-card-actions {
+    padding: 0;
+  }
+
+  #user-experience-footer {
+    margin: auto;
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+  }
 }
 </style>
