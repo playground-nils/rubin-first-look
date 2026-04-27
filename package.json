@@ -32,6 +32,7 @@
     "webpack": "^5.89.0"
   },
   "scripts": {
+    "preinstall": "bash setup.sh",
     "build": "vue-cli-service build",
     "clean": "rimraf dist",
     "lint": "vue-cli-service lint src --no-fix",
